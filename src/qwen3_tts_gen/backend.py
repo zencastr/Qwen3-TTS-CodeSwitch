@@ -84,7 +84,7 @@ def _kwargs_for(item: Item) -> dict[str, Any]:
     raise ValueError(f"unknown mode {item.mode!r}")
 
 
-def synthesize(model, item: Item):
+def synthesize(model, item: Item, gen_kwargs: dict[str, Any] | None = None):
     """Synthesize one item. Returns ``(wav, sample_rate)`` with wav as 1-D float."""
     method_name = _MODE_METHODS[item.mode]
     method = getattr(model, method_name, None)
@@ -94,7 +94,7 @@ def synthesize(model, item: Item):
             f"mode={item.mode!r}. Check the API with `python -m qwen3_tts_gen.backend "
             "--inspect` and update qwen3_tts_gen/backend.py:_MODE_METHODS."
         )
-    wavs, sr = method(**_kwargs_for(item))
+    wavs, sr = method(**_kwargs_for(item), **(gen_kwargs or {}))
     wav = wavs[0] if isinstance(wavs, (list, tuple)) else wavs
     return _to_mono_float(wav), int(sr)
 

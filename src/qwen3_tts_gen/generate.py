@@ -53,6 +53,12 @@ def _build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--report", default=None,
                     help="JSONL report path (default: <out-dir>/report[.shardN].jsonl)")
     ap.add_argument("--cache", default=None, help="override model cache dir (QWEN3_TTS_CACHE)")
+    ap.add_argument("--max-new-tokens", type=int, default=None,
+                    help="cap generated tokens per item; bounds worst-case runaway decode "
+                         "(see qwen3-tts-auto-language-instability memory)")
+    ap.add_argument("--repetition-penalty", type=float, default=None,
+                    help="e.g. 1.3; mitigates non-terminating repetition loops, esp. with "
+                         "language=auto on code-switched text")
     ap.add_argument("--dry-run", action="store_true",
                     help="validate + print the plan without loading the model")
     return ap
@@ -134,8 +140,14 @@ def main(argv=None) -> int:
 
     with report_path.open("w", encoding="utf-8") as report:
         done = 0
+        gen_kwargs = {}
+        if args.max_new_tokens is not None:
+            gen_kwargs["max_new_tokens"] = args.max_new_tokens
+        if args.repetition_penalty is not None:
+            gen_kwargs["repetition_penalty"] = args.repetition_penalty
+
         for chunk in _chunks(items, max(1, args.batch_size)):
-            results = _run_chunk(backend, model, chunk)
+            results = _run_chunk(backend, model, chunk, gen_kwargs)
             for it, (status, err, audio_s, gen_s) in zip(chunk, results):
                 done += 1
                 if status == "ok":
@@ -164,29 +176,29 @@ def main(argv=None) -> int:
     return 1 if (n_ok == 0 and n_err > 0) else 0
 
 
-def _run_chunk(backend, model, chunk):
+def _run_chunk(backend, model, chunk, gen_kwargs=None):
     """Synthesize a chunk. Try a batched call for size>1, fall back per-item."""
     if len(chunk) == 1:
-        return [_run_one(backend, model, chunk[0])]
+        return [_run_one(backend, model, chunk[0], gen_kwargs)]
     try:
-        return _run_batched(backend, model, chunk)
+        return _run_batched(backend, model, chunk, gen_kwargs)
     except Exception as exc:  # noqa: BLE001 - batching is best-effort
         print(f"[batch] batched call failed ({exc}); falling back to per-item",
               file=sys.stderr)
-        return [_run_one(backend, model, it) for it in chunk]
+        return [_run_one(backend, model, it, gen_kwargs) for it in chunk]
 
 
-def _run_one(backend, model, it):
+def _run_one(backend, model, it, gen_kwargs=None):
     t0 = time.perf_counter()
     try:
-        wav, sr = backend.synthesize(model, it)
+        wav, sr = backend.synthesize(model, it, gen_kwargs)
         audio_s = backend.write_wav(it.out_path, wav, sr)
         return ("ok", None, audio_s, time.perf_counter() - t0)
     except Exception as exc:  # noqa: BLE001 - isolate per-item failures
         return ("error", repr(exc), 0.0, time.perf_counter() - t0)
 
 
-def _run_batched(backend, model, chunk):
+def _run_batched(backend, model, chunk, gen_kwargs=None):
     """Batched generation: pass parallel lists to a single generate_* call.
 
     Only attempted for homogeneous clone-mode chunks; anything else raises so
@@ -201,6 +213,7 @@ def _run_batched(backend, model, chunk):
         language=[it.language for it in chunk],
         ref_audio=[it.ref_audio for it in chunk],
         ref_text=[it.ref_text for it in chunk],
+        **(gen_kwargs or {}),
     )
     gen_s = (time.perf_counter() - t0) / len(chunk)
     if not isinstance(wavs, (list, tuple)) or len(wavs) != len(chunk):
