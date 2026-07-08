@@ -1,0 +1,48 @@
+[project]
+name = "qwen3-tts-gen"
+version = "0.1.0"
+description = "Batch voice-cloning speech generation with Qwen3-TTS, SLURM-ready."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "qwen-tts",
+    "torch",
+    "torchaudio",
+    "soundfile>=0.12",
+    # numba/llvmlite (pulled in via qwen-tts -> librosa) must be new enough to
+    # build on Python 3.12; the floor stops uv backtracking to llvmlite 0.36
+    # (Python <3.10 only). numpy is windowed to a range numba + torch agree on.
+    "numba>=0.61",
+    "numpy>=1.26,<2.3",
+    "huggingface-hub[cli]>=0.24",
+    "tqdm>=4.66",
+]
+
+[project.scripts]
+qwen3-tts-download = "qwen3_tts_gen.download:main"
+qwen3-tts-generate = "qwen3_tts_gen.generate:main"
+qwen3-tts-build-manifest = "qwen3_tts_gen.build_manifest:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qwen3_tts_gen"]
+
+# ---------------------------------------------------------------------------
+# PyTorch on Blackwell (B300 / sm_100)
+# ---------------------------------------------------------------------------
+# B300 GPUs need a CUDA 12.8+ build of PyTorch. The login node has no nvcc, so
+# we pull prebuilt CUDA wheels from PyTorch's index instead of building. If
+# torch can't see the GPU at runtime (torch.cuda.is_available() == False, or a
+# "no kernel image" / sm_100 error), bump cu128 -> cu129/cu130 below and re-run
+# `uv lock && uv sync`.
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchaudio = { index = "pytorch-cu128" }

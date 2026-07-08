@@ -1,0 +1,6 @@
+# Example manifest for qwen3_tts_gen. One JSON object per line.
+# Lines starting with '#' and blank lines are ignored.
+# Row 1 uses a REMOTE reference clip, so it runs without any local files.
+{"id": "demo_url", "mode": "clone", "ref_audio": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen3-TTS-Repo/clone.wav", "ref_text": "Okay. Yeah. I resent you. I love you. I respect you. But you know what? You blew it! And thanks to you.", "text": "Hello from Qwen3 TTS. This sentence was generated in a cloned voice.", "language": "English"}
+# Row 2 clones from a LOCAL clip: drop a wav in examples/ and set its exact transcript.
+{"id": "demo_local", "mode": "clone", "ref_audio": "examples/my_reference.wav", "ref_text": "the exact transcript of my_reference.wav", "text": "This line is spoken in the voice from my local reference clip.", "language": "English"}

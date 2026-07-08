@@ -1,0 +1,21 @@
+# uv / Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+
+# Generated audio + reports
+outputs/
+
+# SLURM logs
+logs/
+*.out
+*.err
+
+# Local-only config overrides
+config/cluster.local.env
+
+# Model weights live on /scratch (never commit), but ignore a local ./cache too
+cache/
