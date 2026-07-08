@@ -98,6 +98,16 @@ slurm/submit.sh array 16 manifests/codemixqa_full.jsonl \
   --max-new-tokens 600 --repetition-penalty 1.3
 ```
 
+**Status as of the migration (2026-07-08):** the CodemixQA array job (SLURM
+639, 16 shards) was killed on the old node to free it up for migration. Only
+shard 0 had actually gotten GPU time (`gpu` partition was resource-constrained,
+so shards 1–15 never started) — it wrote 608 items to
+`codemixqa_clone/report.shard0.jsonl` before being cancelled, on top of the
+192 items from the earlier debug run (`report.jsonl`). Total ~800/24000 items
+done. The command above with `--skip-existing` will resume cleanly: shard 0
+picks up after item 608, shards 1–15 start fresh, and everything with a
+completed WAV already in the transferred tarball is skipped.
+
 ## Known gotchas (see repo history / commit messages for detail)
 
 - `language="auto"` + default sampling can non-deterministically hang on
